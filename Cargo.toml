@@ -10,13 +10,46 @@ chrono = "0.4.19"
 dotenv = "0.15.0"
 futures = "0.3.17"
 rand = { version = "0.8.4", features = ["std", "getrandom"] }
-reqwest = { version = "0.11.5", features = ["json", "multipart", "stream", "rustls-tls"], default-features = false }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
-serenity = { version = "0.10.9", features = ["cache", "client", "builder", "gateway", "http", "model", "standard_framework", "utils", "rustls_backend", "collector"], default-features = false }
-sqlx = { version = "0.5.9", features = ["postgres", "runtime-tokio-rustls", "macros", "migrate", "chrono", "offline"] }
 tokio = { version = "1.12.0", features = ["full"] }
 toml = "0.5.8"
 tracing = "0.1.29"
 tracing-log = "0.1.2"
 tracing-subscriber = "0.2.25"
+
+[dependencies.clap]
+version = "3.0.0-beta.4"
+features = ["suggestions", "color", "wrap_help", "unicode_help"]
+
+[dependencies.reqwest]
+version = "0.11.5"
+default-features = false
+features = ["json", "multipart", "stream", "rustls-tls"]
+
+[dependencies.serenity]
+version = "0.10.9"
+default-features = false
+features = [
+    "cache",
+    "client",
+    "builder",
+    "gateway",
+    "http",
+    "model",
+    "standard_framework",
+    "utils",
+    "rustls_backend",
+    "collector",
+]
+
+[dependencies.sqlx]
+version = "0.5.9"
+features = [
+    "postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "migrate",
+    "chrono",
+    "offline",
+]
