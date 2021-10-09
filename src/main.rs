@@ -18,7 +18,7 @@ mod global_data;
 use crate::{config::AkasukiConfig, database::obtain_postgres_pool, global_data::DatabasePool};
 
 fn create_clippy_app(no_color: Option<bool>) -> ClippyApp<'static> {
-    let clap_color_setting = if !env::var_os("NO_COLOR").is_some() && !no_color.unwrap_or(false) {
+    let clap_color_setting = if env::var_os("NO_COLOR").is_none() && !no_color.unwrap_or(false) {
         AppSettings::ColoredHelp
     } else {
         AppSettings::ColorNever
@@ -109,7 +109,7 @@ async fn main() -> AkasukiResult<()> {
 
         // Add the databases connection pools to the data.
         let pg_pool = obtain_postgres_pool().await?;
-        data.insert::<DatabasePool>(pg_pool.clone());
+        data.insert::<DatabasePool>(pg_pool);
     }
 
     if let Err(why) = akasuki.start_autosharded().await {
