@@ -10,6 +10,7 @@ pub struct AkasukiConfig {
     pub tracing: TracingConfig,
     #[serde(default = "default_postgres_config")]
     #[serde(alias = "database")]
+    #[serde(alias = "postgresql")]
     pub postgres: PostgresConfig,
 }
 #[derive(Debug, Deserialize)]
@@ -36,7 +37,7 @@ fn default_tracing_config() -> TracingConfig {
 fn default_postgres_config() -> PostgresConfig {
     PostgresConfig {
         host: docker_host(),
-        port: docker_port(),
+        port: default_psql_port(),
         user: docker_user(),
         password: database_password(),
         database: docker_database(),
@@ -56,7 +57,7 @@ fn docker_host() -> String {
     String::from("akasuki-db")
 }
 
-fn docker_port() -> u16 {
+fn default_psql_port() -> u16 {
     5432
 }
 
@@ -82,7 +83,7 @@ fn docker_database() -> String {
 pub struct PostgresConfig {
     #[serde(default = "docker_host")]
     pub host: String,
-    #[serde(default = "docker_port")]
+    #[serde(default = "default_psql_port")]
     pub port: u16,
     #[serde(default = "docker_user")]
     pub user: String,

@@ -1,6 +1,7 @@
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App as ClippyApp, AppSettings, Arg,
 };
+use database::models::GuildOptions;
 use serenity::{client::bridge::gateway::GatewayIntents, Client};
 use tracing_log::LogTracer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
@@ -101,6 +102,9 @@ async fn main() -> AkasukiResult<()> {
         .await
         .expect("Ottotto couldn't create client >_<");
 
+    let pg_pool = obtain_postgres_pool(config.postgres).await?;
+    sqlx::migrate!().run(&pg_pool).await?;
+
     // Block to define global data.
     // and so the data lock is not kept open in write mode.
     {
@@ -108,7 +112,6 @@ async fn main() -> AkasukiResult<()> {
         let mut data = akasuki.data.write().await;
 
         // Add the databases connection pools to the data.
-        let pg_pool = obtain_postgres_pool().await?;
         data.insert::<DatabasePool>(pg_pool);
     }
 
