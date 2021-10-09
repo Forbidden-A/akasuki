@@ -5,7 +5,7 @@ use serenity::{
     http::Http,
     model::{id::UserId, prelude::CurrentApplicationInfo},
 };
-use tracing::log::info;
+use tracing::debug;
 
 use crate::AkasukiResult;
 
@@ -27,7 +27,7 @@ pub async fn create_framework(token: &str) -> AkasukiResult<StandardFramework> {
         s
     };
 
-    info!("Owners: {:?}", &owners);
+    debug!("Owners: {:?}", &owners);
     let framework = StandardFramework::new().configure(|c| c.prefix("a:").owners(owners));
     Ok(framework)
 }
