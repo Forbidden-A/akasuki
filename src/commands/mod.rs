@@ -1,10 +1,12 @@
+mod ping;
+
 use serenity::{
     http::Http,
     model::{id::UserId, prelude::CurrentApplicationInfo},
 };
 use std::{collections::HashSet, iter::FromIterator, time::Duration};
 
-use crate::{listeners, AkasukiError, AkasukiResult};
+use crate::{global_data::AkasukiData, listeners, AkasukiError, AkasukiResult, Context};
 
 pub async fn get_application_info(token: &str) -> AkasukiResult<CurrentApplicationInfo> {
     let http = Http::new_with_token(token);
@@ -25,13 +27,20 @@ pub async fn on_error<D>(e: AkasukiError, ctx: poise::ErrorContext<'_, D, Akasuk
     }
 }
 
-pub async fn configure<A>(
-    framework: poise::FrameworkBuilder<A, AkasukiError>,
+// Register application commands in this guild or globally
+///
+/// Run with no arguments to register in guild, run with argument "global" to register globally.
+#[poise::command(prefix_command, hide_in_help, rename = "register")]
+async fn register_cmd(ctx: Context<'_>, #[flag] global: bool) -> AkasukiResult<()> {
+    poise::samples::register_application_commands(ctx, global).await?;
+
+    Ok(())
+}
+
+pub async fn configure(
+    framework: poise::FrameworkBuilder<AkasukiData, AkasukiError>,
     token: &str,
-) -> AkasukiResult<poise::FrameworkBuilder<A, AkasukiError>>
-where
-    A: std::marker::Sync + std::marker::Send,
-{
+) -> AkasukiResult<poise::FrameworkBuilder<AkasukiData, AkasukiError>> {
     let application_info = get_application_info(token).await?;
     let owners: HashSet<UserId> = if let Some(team) = application_info.team {
         HashSet::from_iter(team.members.iter().map(|m| m.user.id))
@@ -47,14 +56,19 @@ where
             edit_tracker: Some(poise::EditTracker::for_timespan(Duration::from_secs(3600))),
             ..Default::default()
         },
+        application_options: poise::ApplicationFrameworkOptions {
+            ..Default::default()
+        },
         owners,
         listener: listeners::listener,
         ..Default::default()
     }))
 }
 
-pub async fn register<A>(
-    framework: poise::FrameworkBuilder<A, AkasukiError>,
-) -> AkasukiResult<poise::FrameworkBuilder<A, AkasukiError>> {
-    Ok(framework)
+pub async fn register(
+    framework: poise::FrameworkBuilder<AkasukiData, AkasukiError>,
+) -> AkasukiResult<poise::FrameworkBuilder<AkasukiData, AkasukiError>> {
+    Ok(framework
+        .command(ping::ping(), |f| f.category("General"))
+        .command(register_cmd(), |f| f.category("Owner Only")))
 }

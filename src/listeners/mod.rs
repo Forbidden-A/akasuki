@@ -8,7 +8,7 @@ use crate::{AkasukiError, AkasukiResult};
 
 pub async fn log_event<'a>(
     _ctx: &serenity::prelude::Context,
-    e: &'a Event<'_>,
+    e: &'_ Event<'_>,
 ) -> AkasukiResult<()> {
     debug!("Got event: {:?}", e);
     Ok(())

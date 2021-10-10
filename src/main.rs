@@ -1,6 +1,7 @@
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App as ClippyApp, AppSettings, Arg,
 };
+use poise::serenity_prelude::Mutex;
 use std::{env, error::Error};
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::{info, instrument, Level};
@@ -102,7 +103,7 @@ async fn main() -> AkasukiResult<()> {
         .user_data_setup(move |_ctx, _ready, _framework| {
             Box::pin(async move {
                 Ok(AkasukiData {
-                    postgres_pool: pg_pool,
+                    postgres_pool: Mutex::new(pg_pool),
                 })
             })
         });
