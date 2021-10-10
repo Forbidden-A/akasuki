@@ -1,8 +1,7 @@
 use crate::{AkasukiResult, Context};
 use chrono::Utc;
-use poise::serenity_prelude as serenity;
 
-const PING_URL: &'static str = "https://discord.com/api/gateway";
+const PING_URL: &str = "https://discord.com/api/gateway";
 
 async fn ping_http() -> AkasukiResult<i64> {
     let start = Utc::now();

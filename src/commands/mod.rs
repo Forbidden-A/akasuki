@@ -1,5 +1,5 @@
 mod ping;
-
+mod role;
 use serenity::{
     http::Http,
     model::{id::UserId, prelude::CurrentApplicationInfo},
@@ -70,5 +70,10 @@ pub async fn register(
 ) -> AkasukiResult<poise::FrameworkBuilder<AkasukiData, AkasukiError>> {
     Ok(framework
         .command(ping::ping(), |f| f.category("General"))
+        .command(role::role(), |f| {
+            f.category("Utility")
+                .subcommand(role::add_role(), |f| f.category("Utility"))
+                .subcommand(role::remove_role(), |f| f.category("Utility"))
+        })
         .command(register_cmd(), |f| f.category("Owner Only")))
 }
