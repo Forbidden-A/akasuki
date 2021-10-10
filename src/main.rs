@@ -1,22 +1,19 @@
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, App as ClippyApp, AppSettings, Arg,
 };
-use database::models::GuildOptions;
-use serenity::{client::bridge::gateway::GatewayIntents, Client};
-use tracing_log::LogTracer;
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
-
 use std::{env, error::Error};
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::{info, instrument, Level};
+use tracing_log::LogTracer;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 mod commands;
 mod config;
 mod database;
-mod events;
 mod global_data;
+mod listeners;
 
-use crate::{config::AkasukiConfig, database::obtain_postgres_pool, global_data::DatabasePool};
+use crate::{config::AkasukiConfig, database::obtain_postgres_pool, global_data::AkasukiData};
 
 fn create_clippy_app(no_color: Option<bool>) -> ClippyApp<'static> {
     let clap_color_setting = if env::var_os("NO_COLOR").is_none() && !no_color.unwrap_or(false) {
@@ -49,7 +46,8 @@ fn create_clippy_app(no_color: Option<bool>) -> ClippyApp<'static> {
 }
 
 // Funny little type aliases ;P
-type AkasukiError = Box<dyn Error + Send + Sync>;
+type AkasukiError = Box<dyn Error + Send + Sync + 'static>;
+type Context<'a> = poise::Context<'a, AkasukiData, AkasukiError>;
 type AkasukiResult<R> = Result<R, AkasukiError>;
 
 #[tokio::main]
@@ -95,27 +93,23 @@ async fn main() -> AkasukiResult<()> {
         info!("Subscriber initialized.");
     }
 
-    let mut akasuki = Client::builder(&token)
-        .event_handler(events::Handler)
-        .framework(commands::create_framework(&token).await?)
-        .intents(GatewayIntents::all())
-        .await
-        .expect("Ottotto couldn't create client >_<");
-
     let pg_pool = obtain_postgres_pool(config.postgres).await?;
     sqlx::migrate!().run(&pg_pool).await?;
 
-    // Block to define global data.
-    // and so the data lock is not kept open in write mode.
-    {
-        // Open the data lock in write mode.
-        let mut data = akasuki.data.write().await;
+    let mut akasuki = poise::Framework::build()
+        .prefix("a:")
+        .token(&token)
+        .user_data_setup(move |_ctx, _ready, _framework| {
+            Box::pin(async move {
+                Ok(AkasukiData {
+                    postgres_pool: pg_pool,
+                })
+            })
+        });
 
-        // Add the databases connection pools to the data.
-        data.insert::<DatabasePool>(pg_pool);
-    }
+    akasuki = commands::register(commands::configure(akasuki, &token).await?).await?;
 
-    if let Err(why) = akasuki.start_autosharded().await {
+    if let Err(why) = akasuki.run().await {
         eprintln!("Oof couldn't start akasuki T-T: {:?}", why);
     }
     Ok(())

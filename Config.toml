@@ -1,2 +1,7 @@
 [bot]
 token = "sike you thought"
+
+[postgresql]
+host = "127.0.0.1"
+user = "forb"
+database = "akasuki"

@@ -14,6 +14,16 @@ pub struct GuildOptions {
 }
 
 impl GuildOptions {
+    pub async fn create_for_id(id: i64, pool: &PgPool) -> AkasukiResult<GuildOptions> {
+        Ok(query_as!(
+            GuildOptions,
+            r#"INSERT INTO akasuki.guild_options (guild_id) VALUES ($1) RETURNING *"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
     pub async fn for_id(id: i64, pool: &PgPool) -> AkasukiResult<GuildOptions> {
         Ok(query_as!(
             GuildOptions,
@@ -32,15 +42,5 @@ impl GuildOptions {
         } else {
             opts
         }
-    }
-
-    pub async fn create_for_id(id: i64, pool: &PgPool) -> AkasukiResult<GuildOptions> {
-        Ok(query_as!(
-            GuildOptions,
-            r#"INSERT INTO akasuki.guild_options (guild_id) VALUES ($1) RETURNING *"#,
-            id
-        )
-        .fetch_one(pool)
-        .await?)
     }
 }
