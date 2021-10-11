@@ -1,11 +1,20 @@
 use std::collections::HashMap;
 
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, guild, Role, RoleId};
 
-use crate::{AkasukiResult, Context};
+use crate::{
+    commands::{checks, role},
+    utils, AkasukiResult, Context,
+};
+
+async fn prefix_check(ctx: Context<'_>) -> AkasukiResult<bool> {
+    Ok(
+        checks::guild_only(ctx).await?, /* && /*  bot can manage roles */ */
+    )
+}
 
 /// Manage your roles
-#[poise::command(slash_command, ephemeral)]
+#[poise::command(slash_command, ephemeral, check = "prefix_check")]
 pub async fn role(ctx: Context<'_>) -> AkasukiResult<()> {
     poise::send_reply(ctx, |create| {
         create
@@ -16,158 +25,90 @@ pub async fn role(ctx: Context<'_>) -> AkasukiResult<()> {
     Ok(())
 }
 
-fn create_components_for_roles<'a>(
-    create: &'a mut serenity::CreateComponents,
-    _ctx: Context<'_>,
-    guild: &serenity::Guild,
-    user_roles: HashMap<serenity::RoleId, serenity::Role>,
-    remove: bool,
-    menu_id: String,
-) -> &'a mut serenity::CreateComponents {
-    create.create_action_row(|create_row| {
-        create_row.create_select_menu(|create_menu| {
-            create_menu
-                .max_values(1)
-                .min_values(1)
-                .placeholder("Select a role")
-                .options(|create_options| {
-                    for (id, role) in guild.roles.iter() {
-                        if (remove && !user_roles.contains_key(id))
-                            || (!remove && user_roles.contains_key(id))
-                        {
-                            continue;
-                        }
-                        create_options.create_option(|create_option| {
-                            let option = create_option;
-                            // check for role icon; if
-                            option.label(role.name.as_str()).value(id)
-                        });
-                    }
-                    create_options
-                })
-                .custom_id(menu_id)
-        })
-    })
-}
-
 /// Manage your roles
-#[poise::command(slash_command, rename = "add")]
+#[poise::command(slash_command, rename = "add", check = "prefix_check")]
 pub async fn add_role(context: Context<'_>) -> AkasukiResult<()> {
-    if let poise::Context::Application(ctx) = context {
-        if let Some(guild) = context.guild() {
-            let author = context.author();
-            let menu_id = format!("ADD_MENU_{}", author.name);
-            let mut roles = HashMap::<serenity::RoleId, serenity::Role>::new();
-            {
-                let guild_1 = context.guild().unwrap();
-                for (id, role) in guild_1.roles.iter() {
-                    if author.has_role(context.discord(), guild.id, role).await? {
-                        roles.insert(*id, role.clone());
-                    }
-                }
-            }
-
-            let message = poise::send_reply(context, |create| {
-                create
-                    .content("Select a role to apply")
-                    .components(|create| {
-                        create_components_for_roles(create, context, &guild, roles, false, menu_id)
-                    })
+    if let Some(guild) = context.guild() {
+        let uuid_menu = uuid::Uuid::new_v4().to_string();
+        let mut member = guild.member(context.discord(), context.author().id).await?;
+        let roles = utils::roles::get_non_member_roles(&guild, &member);
+        let filtered_roles = roles
+            .iter()
+            .filter(|(_id, _role)| {
+                // TODO filter self roles.
+                true
             })
-            .await?
-            .message()
-            .await?;
-
-            let interaction = message
-                .await_component_interaction(&context.discord().shard)
-                .await;
-            if let Some(interaction) = interaction {
-                let role_id = interaction.data.values[0].parse::<u64>()?;
-                let role = guild.roles.get(&serenity::RoleId::from(role_id)).unwrap();
-                interaction
-                    .create_interaction_response(context.discord(), |f| {
-                        f.interaction_response_data(|f| {
-                            f.content(format!(
-                                "{} Giving you {}",
-                                serenity::Mentionable::mention(&author.id),
-                                role
-                            ))
+            .collect::<HashMap<&RoleId, &Role>>();
+        let handle = poise::send_reply(context, |m| {
+            m.content("Please select a role!");
+            m.components(|c| {
+                c.create_action_row(|ar| {
+                    ar.create_select_menu(|menu| {
+                        menu.custom_id(&uuid_menu);
+                        menu.options(|options| {
+                            for (id, role) in filtered_roles.iter() {
+                                options.create_option(|option| {
+                                    option
+                                        .label(String::from(&role.name))
+                                        .description("")
+                                        .value(id)
+                                });
+                            }
+                            options
                         })
+                        .placeholder("Select a role")
+                        .max_values(1)
+                        .min_values(1)
                     })
-                    .await?;
-                ctx.interaction
-                    .edit_original_interaction_response(context.discord(), |f| f.components(|f| f))
-                    .await?;
-                let mut member = interaction.member.as_ref().unwrap().clone();
-                member.add_role(context.discord(), role_id).await?
-            }
-        } else {
-            poise::send_reply(context, |create| {
-                create.content("This command can only be used inside a guild.")
+                })
+            });
+            m
+        })
+        .await?;
+
+        let mci = serenity::collector::CollectComponentInteraction::new(context.discord())
+            .author_id(context.author().id)
+            .channel_id(context.channel_id())
+            .timeout(std::time::Duration::from_secs(300))
+            .filter(move |mci| mci.data.custom_id == uuid_menu.clone())
+            .await;
+        if let Some(mci) = mci {
+            let role_id = mci.data.values[0].parse::<u64>()?;
+            let role = guild.roles.get(&serenity::RoleId::from(role_id)).unwrap();
+            member.add_role(context.discord(), &role.id).await?;
+            let mut msg = mci.message.clone();
+            msg.edit(context.discord(), |m| {
+                m.content(format!(
+                    "Gave you: {}",
+                    serenity::Mentionable::mention(&role.id)
+                ))
+                .components(|c| c)
             })
             .await?;
+
+            mci.create_interaction_response(context.discord(), |ir| {
+                ir.kind(poise::serenity_prelude::InteractionResponseType::DeferredUpdateMessage)
+            })
+            .await?;
+        } else {
+            handle
+                .message()
+                .await?
+                .edit(context.discord(), |f| {
+                    f.content("Timed out!").components(|c| c)
+                })
+                .await?;
         }
     }
+
     Ok(())
 }
 
 /// Manage your roles
-#[poise::command(slash_command, rename = "remove")]
+#[poise::command(slash_command, rename = "remove", check = "checks::guild_only")]
 pub async fn remove_role(context: Context<'_>) -> AkasukiResult<()> {
-    if let poise::Context::Application(ctx) = context {
-        if let Some(guild) = context.guild() {
-            let author = context.author();
-            let menu_id = format!("REMOVE_MENU_{}", author.name);
-            let mut roles = HashMap::<serenity::RoleId, serenity::Role>::new();
-            {
-                let guild_1 = context.guild().unwrap();
-                for (id, role) in guild_1.roles.iter() {
-                    if !author.has_role(context.discord(), guild.id, role).await? {
-                        roles.insert(*id, role.clone());
-                    }
-                }
-            }
-
-            let message = poise::send_reply(context, |create| {
-                create
-                    .content("Select a role to remove")
-                    .components(|create| {
-                        create_components_for_roles(create, context, &guild, roles, false, menu_id)
-                    })
-            })
-            .await?
-            .message()
-            .await?;
-
-            let interaction = message
-                .await_component_interaction(&context.discord().shard)
-                .await;
-            if let Some(interaction) = interaction {
-                let role_id = interaction.data.values[0].parse::<u64>()?;
-                let role = guild.roles.get(&serenity::RoleId::from(role_id)).unwrap();
-                interaction
-                    .create_interaction_response(context.discord(), |f| {
-                        f.interaction_response_data(|f| {
-                            f.content(format!(
-                                "{} Taking away {}",
-                                serenity::Mentionable::mention(&author.id),
-                                role
-                            ))
-                        })
-                    })
-                    .await?;
-                ctx.interaction
-                    .edit_original_interaction_response(context.discord(), |f| f.components(|f| f))
-                    .await?;
-                let mut member = interaction.member.as_ref().unwrap().clone();
-                member.remove_role(context.discord(), role_id).await?
-            }
-        } else {
-            poise::send_reply(context, |create| {
-                create.content("This command can only be used inside a guild.")
-            })
-            .await?;
-        }
+    if let Some(guild) = context.guild() {
+    } else {
     }
     Ok(())
 }

@@ -1,3 +1,5 @@
+mod boop;
+pub mod checks;
 mod ping;
 mod role;
 use serenity::{
@@ -75,5 +77,6 @@ pub async fn register(
                 .subcommand(role::add_role(), |f| f.category("Utility"))
                 .subcommand(role::remove_role(), |f| f.category("Utility"))
         })
+        .command(boop::boop(), |f| f.category("Fun"))
         .command(register_cmd(), |f| f.category("Owner Only")))
 }

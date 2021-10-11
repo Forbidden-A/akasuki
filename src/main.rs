@@ -13,6 +13,7 @@ mod config;
 mod database;
 mod global_data;
 mod listeners;
+mod utils;
 
 use crate::{config::AkasukiConfig, database::obtain_postgres_pool, global_data::AkasukiData};
 

@@ -23,6 +23,11 @@ tracing-futures = "0.2.5"
 darkredis = "0.8.0"
 poise = { git = "https://github.com/kangalioo/poise.git", rev = "48d65f6" }
 
+[dependencies.uuid]
+version = "0.8"
+features = ["v4"]
+
+
 [dependencies.clap]
 version = "3.0.0-beta.4"
 features = ["suggestions", "color", "wrap_help", "unicode_help"]
@@ -48,6 +53,7 @@ features = [
     "utils",
     "rustls_backend",
     "collector",
+    "unstable_discord_api",
 ]
 
 [dependencies.sqlx]
