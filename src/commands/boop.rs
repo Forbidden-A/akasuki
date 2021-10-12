@@ -48,19 +48,20 @@ pub async fn boop(ctx: AkasukiContext<'_>) -> AkasukiResult<()> {
                 .message()
                 .await?
                 .edit(ctx.discord(), |f| {
-                    f.content("Timed out!").components(|c| {
-                        c.create_action_row(|ar| {
-                            ar.create_button(|b| {
-                                b.style(poise::serenity_prelude::ButtonStyle::Primary)
-                                    .label("Boop me please!")
-                                    .emoji(poise::serenity_prelude::ReactionType::Unicode(
-                                        "\u{1f97a}".to_string(),
-                                    ))
-                                    .disabled(true)
-                                    .custom_id(&uuid_boop)
+                    f.content(format!("Timed out! You booped me {} times!", boop_count))
+                        .components(|c| {
+                            c.create_action_row(|ar| {
+                                ar.create_button(|b| {
+                                    b.style(poise::serenity_prelude::ButtonStyle::Primary)
+                                        .label("Boop me please!")
+                                        .emoji(poise::serenity_prelude::ReactionType::Unicode(
+                                            "\u{1f97a}".to_string(),
+                                        ))
+                                        .disabled(true)
+                                        .custom_id(&uuid_boop)
+                                })
                             })
                         })
-                    })
                 })
                 .await?;
             break;
