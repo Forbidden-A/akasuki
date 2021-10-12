@@ -1,4 +1,4 @@
-use crate::{AkasukiResult, Context};
+use crate::{AkasukiContext, AkasukiResult};
 use chrono::Utc;
 
 const PING_URL: &str = "https://discord.com/api/gateway";
@@ -13,7 +13,7 @@ async fn ping_http() -> AkasukiResult<i64> {
 
 /// Get bot ping
 #[poise::command(slash_command, ephemeral)]
-pub async fn ping(context: Context<'_>) -> AkasukiResult<()> {
+pub async fn ping(context: AkasukiContext<'_>) -> AkasukiResult<()> {
     if let poise::Context::Application(ctx) = context {
         let interaction = ctx.interaction;
         poise::send_reply(context, |create| {

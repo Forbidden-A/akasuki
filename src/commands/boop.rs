@@ -1,8 +1,8 @@
-use crate::{AkasukiResult, Context};
+use crate::{AkasukiContext, AkasukiResult};
 
 /// Boop
 #[poise::command(slash_command)]
-pub async fn boop(ctx: Context<'_>) -> AkasukiResult<()> {
+pub async fn boop(ctx: AkasukiContext<'_>) -> AkasukiResult<()> {
     let mut boop_count = 0;
     let uuid_boop = uuid::Uuid::new_v4().to_string();
 

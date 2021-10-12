@@ -37,6 +37,15 @@ version = "0.11.5"
 default-features = false
 features = ["json", "multipart", "stream", "rustls-tls"]
 
+[dependencies.lavalink-rs]
+version = "0.9.0-rc.2"
+features = ["rustls", "songbird", "serenity"]
+
+[dependencies.songbird]
+version = "0.2"
+features = ["serenity-rustls", "gateway"]
+
+
 [dependencies.serenity]
 # version = "0.10.9"
 # For poise..
@@ -48,6 +57,7 @@ features = [
     "client",
     "builder",
     "gateway",
+    "voice",
     "http",
     "model",
     "utils",
@@ -66,3 +76,7 @@ features = [
     "chrono",
     "offline",
 ]
+
+[patch.crates-io.serenity]
+git = "https://github.com/serenity-rs/serenity"
+branch = "next"

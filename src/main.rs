@@ -1,7 +1,5 @@
-use clap::{
-    crate_authors, crate_description, crate_name, crate_version, App as ClippyApp, AppSettings, Arg,
-};
 use poise::serenity_prelude::Mutex;
+use songbird::SerenityInit;
 use std::{env, error::Error};
 use tokio::{fs::File, io::AsyncReadExt};
 use tracing::{info, instrument, Level};
@@ -15,41 +13,36 @@ mod global_data;
 mod listeners;
 mod utils;
 
-use crate::{config::AkasukiConfig, database::obtain_postgres_pool, global_data::AkasukiData};
+use crate::{
+    config::AkasukiConfig,
+    database::obtain_postgres_pool,
+    global_data::AkasukiData,
+    utils::{create_clippy_app, get_application_info},
+};
 
-fn create_clippy_app(no_color: Option<bool>) -> ClippyApp<'static> {
-    let clap_color_setting = if env::var_os("NO_COLOR").is_none() && !no_color.unwrap_or(false) {
-        AppSettings::ColoredHelp
-    } else {
-        AppSettings::ColorNever
-    };
+struct LavalinkHandler;
 
-    let app = ClippyApp::new(crate_name!())
-        .version(crate_version!())
-        .global_setting(clap_color_setting)
-        .about(crate_description!())
-        .author(crate_authors!())
-        .arg(
-            Arg::new("config")
-                .short('c')
-                .alias("cfg")
-                .value_name("FILE")
-                .about("Location of Config.toml")
-                .default_value("./Config.toml"),
-        )
-        .arg(
-            Arg::new("use_env")
-                .takes_value(false)
-                .short('e')
-                .about("Whether or not the bot should use environment variable, this flag will be ignored if '.env' is present."),
-        );
-
-    app
+#[lavalink_rs::async_trait]
+impl lavalink_rs::gateway::LavalinkEventHandler for LavalinkHandler {
+    async fn track_start(
+        &self,
+        _client: lavalink_rs::LavalinkClient,
+        event: lavalink_rs::model::TrackStart,
+    ) {
+        info!("Track started!\nGuild: {}", event.guild_id);
+    }
+    async fn track_finish(
+        &self,
+        _client: lavalink_rs::LavalinkClient,
+        event: lavalink_rs::model::TrackFinish,
+    ) {
+        info!("Track finished!\nGuild: {}", event.guild_id);
+    }
 }
 
 // Funny little type aliases ;P
 type AkasukiError = Box<dyn Error + Send + Sync + 'static>;
-type Context<'a> = poise::Context<'a, AkasukiData, AkasukiError>;
+type AkasukiContext<'a> = poise::Context<'a, AkasukiData, AkasukiError>;
 type AkasukiResult<R> = Result<R, AkasukiError>;
 
 #[tokio::main]
@@ -67,7 +60,11 @@ async fn main() -> AkasukiResult<()> {
     } else {
         env::var("AKASUKI_TOKEN").unwrap_or_else(|_| config.discord.token.to_string())
     };
-
+    let lavalink_pwd = if !use_env {
+        config.voice.password.to_string()
+    } else {
+        env::var("LAVALINK_PASSWORD").unwrap_or_else(|_| config.voice.password.to_string())
+    };
     if config.tracing.enabled {
         LogTracer::init()?;
         let level = match config.tracing.tracing_level.as_str() {
@@ -97,7 +94,16 @@ async fn main() -> AkasukiResult<()> {
 
     let pg_pool = obtain_postgres_pool(config.postgres).await?;
     sqlx::migrate!().run(&pg_pool).await?;
+    let app_info = get_application_info(token.as_str()).await?;
+    let bot_id = *app_info.id.as_u64();
+    let lava_client = lavalink_rs::LavalinkClient::builder(bot_id)
+        .set_host(config.voice.host)
+        .set_port(config.voice.port)
+        .set_password(lavalink_pwd)
+        .build(LavalinkHandler)
+        .await?;
 
+    let mov_bot_id = bot_id.clone();
     let mut akasuki = poise::Framework::build()
         .prefix("a:")
         .token(&token)
@@ -105,11 +111,18 @@ async fn main() -> AkasukiResult<()> {
             Box::pin(async move {
                 Ok(AkasukiData {
                     postgres_pool: Mutex::new(pg_pool),
+                    lavalink: lava_client,
                 })
             })
+        })
+        .client_settings(move |builder| {
+            builder
+                .application_id(mov_bot_id)
+                .cache_settings(|cache| cache.max_messages(512))
+                .register_songbird()
         });
 
-    akasuki = commands::register(commands::configure(akasuki, &token).await?).await?;
+    akasuki = commands::register(commands::configure(akasuki, &app_info).await?).await?;
 
     if let Err(why) = akasuki.run().await {
         eprintln!("Oof couldn't start akasuki T-T: {:?}", why);

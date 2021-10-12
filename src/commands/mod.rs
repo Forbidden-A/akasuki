@@ -1,22 +1,14 @@
 mod boop;
 pub mod checks;
+mod music;
 mod ping;
-mod role;
-use serenity::{
-    http::Http,
-    model::{id::UserId, prelude::CurrentApplicationInfo},
-};
+use serenity::model::{id::UserId, prelude::CurrentApplicationInfo};
 use std::{collections::HashSet, iter::FromIterator, time::Duration};
 
-use crate::{global_data::AkasukiData, listeners, AkasukiError, AkasukiResult, Context};
-
-pub async fn get_application_info(token: &str) -> AkasukiResult<CurrentApplicationInfo> {
-    let http = Http::new_with_token(token);
-
-    let info = http.get_current_application_info().await?;
-
-    Ok(info)
-}
+use crate::{
+    global_data::AkasukiData, listeners, utils::get_application_info, AkasukiContext, AkasukiError,
+    AkasukiResult,
+};
 
 pub async fn on_error<D>(e: AkasukiError, ctx: poise::ErrorContext<'_, D, AkasukiError>) {
     println!("Encountered an error: {:?}", e);
@@ -33,7 +25,7 @@ pub async fn on_error<D>(e: AkasukiError, ctx: poise::ErrorContext<'_, D, Akasuk
 ///
 /// Run with no arguments to register in guild, run with argument "global" to register globally.
 #[poise::command(prefix_command, hide_in_help, rename = "register")]
-async fn register_cmd(ctx: Context<'_>, #[flag] global: bool) -> AkasukiResult<()> {
+async fn register_cmd(ctx: AkasukiContext<'_>, #[flag] global: bool) -> AkasukiResult<()> {
     poise::samples::register_application_commands(ctx, global).await?;
 
     Ok(())
@@ -41,10 +33,9 @@ async fn register_cmd(ctx: Context<'_>, #[flag] global: bool) -> AkasukiResult<(
 
 pub async fn configure(
     framework: poise::FrameworkBuilder<AkasukiData, AkasukiError>,
-    token: &str,
+    application_info: &CurrentApplicationInfo,
 ) -> AkasukiResult<poise::FrameworkBuilder<AkasukiData, AkasukiError>> {
-    let application_info = get_application_info(token).await?;
-    let owners: HashSet<UserId> = if let Some(team) = application_info.team {
+    let owners: HashSet<UserId> = if let Some(team) = &application_info.team {
         HashSet::from_iter(team.members.iter().map(|m| m.user.id))
     } else {
         let mut s = HashSet::new();
@@ -72,11 +63,16 @@ pub async fn register(
 ) -> AkasukiResult<poise::FrameworkBuilder<AkasukiData, AkasukiError>> {
     Ok(framework
         .command(ping::ping(), |f| f.category("General"))
-        .command(role::role(), |f| {
-            f.category("Utility")
-                .subcommand(role::add_role(), |f| f.category("Utility"))
-                .subcommand(role::remove_role(), |f| f.category("Utility"))
+        .command(music::music(), |f| {
+            f.category("Music")
+                .subcommand(music::play::play_command(), |f| f.category("Music"))
+                .subcommand(music::queue::queue_command(), |f| f.category("Music"))
         })
+        // .command(role::role(), |f| {
+        //     f.category("Utility")
+        //         .subcommand(role::add_role(), |f| f.category("Utility"))
+        //         .subcommand(role::remove_role(), |f| f.category("Utility"))
+        // })
         .command(boop::boop(), |f| f.category("Fun"))
         .command(register_cmd(), |f| f.category("Owner Only")))
 }

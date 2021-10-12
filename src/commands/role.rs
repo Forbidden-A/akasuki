@@ -1,16 +1,22 @@
 use std::collections::HashMap;
 
-use poise::serenity_prelude::{self as serenity, guild, Role, RoleId};
+use poise::serenity_prelude::{self as serenity, Role, RoleId};
 
-use crate::{
-    commands::{checks, role},
-    utils, AkasukiResult, Context,
-};
+use crate::{commands::checks, utils, AkasukiResult, Context};
 
 async fn prefix_check(ctx: Context<'_>) -> AkasukiResult<bool> {
-    Ok(
-        checks::guild_only(ctx).await?, /* && /*  bot can manage roles */ */
-    )
+    if let Some(guild) = ctx.guild() {
+        let current_user = ctx.discord().cache.current_user();
+
+        let permissions = guild
+            .member_permissions(ctx.discord(), current_user)
+            .await?;
+
+        Ok(permissions.contains(serenity::Permissions::MANAGE_ROLES)
+            || permissions.contains(serenity::Permissions::ADMINISTRATOR))
+    } else {
+        Ok(false)
+    }
 }
 
 /// Manage your roles
@@ -34,9 +40,9 @@ pub async fn add_role(context: Context<'_>) -> AkasukiResult<()> {
         let roles = utils::roles::get_non_member_roles(&guild, &member);
         let filtered_roles = roles
             .iter()
-            .filter(|(_id, _role)| {
+            .filter(|(id, _role)| {
                 // TODO filter self roles.
-                true
+                id.as_u64() != guild.id.as_u64()
             })
             .collect::<HashMap<&RoleId, &Role>>();
         let handle = poise::send_reply(context, |m| {

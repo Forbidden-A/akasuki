@@ -12,6 +12,8 @@ pub struct AkasukiConfig {
     #[serde(alias = "database")]
     #[serde(alias = "postgresql")]
     pub postgres: PostgresConfig,
+    #[serde(alias = "music")]
+    pub voice: VoiceConfig,
 }
 #[derive(Debug, Deserialize)]
 pub struct DiscordConfig {
@@ -91,4 +93,33 @@ pub struct PostgresConfig {
     pub password: String,
     #[serde(default = "docker_database")]
     pub database: String,
+}
+
+fn voice_host() -> String {
+    String::from("127.0.0.1")
+}
+
+fn voice_password() -> String {
+    let pwd = env::var("LAVALINK_PASSWORD");
+    if let Err(why) = pwd {
+        eprintln!("Kuso! Failed to get lavalink password >_<: {}", why);
+        exit(-1)
+    }
+
+    pwd.unwrap()
+}
+
+fn voice_port() -> u16 {
+    8080u16
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VoiceConfig {
+    #[serde(default = "voice_host")]
+    pub host: String,
+    #[serde(default = "voice_port")]
+    pub port: u16,
+    #[serde(default = "voice_password")]
+    #[serde(alias = "lavalink_password")]
+    pub password: String,
 }
